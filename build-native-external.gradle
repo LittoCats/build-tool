@@ -84,10 +84,24 @@ def prepareCMakeExtra() {
             "target_link_libraries(\${LIB_NAME} folly_json folly_futures glog c++_shared)"
 
     def cmake = file(buildDir.absolutePath + '/intermediates/cmake/CMakeLists.txt')
-    if (cmake.exists()) return cmake
+    if (!cmake.exists()) {
+        cmake.parentFile.mkdirs()
+        cmake.text = extra
+    }
 
-    cmake.parentFile.mkdirs()
-    cmake.text = extra
+    def cpp = file('src/main/c++/CMakeLists.txt')
+    if (!cpp.exists()) {
+        cpp.parentFile.mkdirs();
+        cpp.text = "cmake_minimum_required(VERSION 3.18)\n" +
+                "project(\${LIB_NAME})\n" +
+                "\n" +
+                "set(SRC\n" +
+                "\n" +
+                ")\n" +
+                "\n" +
+                "\n" +
+                "include(\${LIB_DEFAULTS_CONFIG})"
+    }
 
     return cmake
 }
@@ -103,4 +117,3 @@ tasks.all {
                 ReactAndroid.tasks.getByName('prepareGlog')
         )
     }
-}
