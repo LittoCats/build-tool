@@ -1,0 +1,106 @@
+/**
+ * @author      : 程巍巍 (littocats@gmail.com)
+ * @file        : build-native-external.gradle
+ * @created     : 星期五 2月 05, 2021 15:13:24 CST
+ *
+ * You should add following to settings.gradle in rootProject
+ *
+    include ':ReactAndroid'
+    project(':ReactAndroid').projectDir = new File(settingsDir, '../node_modules/react-native/ReactAndroid')
+ *
+ */
+
+
+def ReactAndroid = project(':ReactAndroid')
+
+def REACT_VERSION = ReactAndroid.ext.VERSION_NAME
+def BOOST_VERSION = ReactAndroid.ext.BOOST_VERSION
+def DOUBLE_CONVERSION_VERSION = ReactAndroid.ext.DOUBLE_CONVERSION_VERSION
+def FOLLY_VERSION = ReactAndroid.ext.FOLLY_VERSION
+def GLOG_VERSION = ReactAndroid.ext.GLOG_VERSION
+def REACT_ROOT = ReactAndroid.projectDir.parent
+
+static def camel(String str) {
+    return str.replaceAll(/(^[a-z])|([-_][a-z])/) {
+        return it[0].toUpperCase()
+    }.replaceAll(/[-_]/, '')
+}
+
+def LIB_NAME = camel name
+
+android {
+
+    defaultConfig {
+
+        buildConfigField 'String', 'LIB_NAME', '"' + LIB_NAME + '"'
+
+        externalNativeBuild {
+            cmake {
+               arguments '-DLIB_NAME=' + LIB_NAME,
+                       '-DREACT_VERSION=' + REACT_VERSION,
+                       '-DREACT_ROOT=' + REACT_ROOT,
+                       '-DBOOST_VERSION=' + BOOST_VERSION,
+                       '-DDOUBLE_CONVERSION_VERSION=' + DOUBLE_CONVERSION_VERSION,
+                       '-DFOLLY_VERSION=' + FOLLY_VERSION,
+                       '-DGLOG_VERSION=' + GLOG_VERSION,
+                       '-DLIB_DEFAULTS_CONFIG=' + prepareCMakeExtra().absolutePath
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('src/main/c++/CMakeLists.txt')
+            version '3.18.1'
+        }
+    }
+}
+
+def prepareCMakeExtra() {
+    def extra = "string(TOLOWER \${CMAKE_BUILD_TYPE} ANDROID_BUILD_TYPE)\n" +
+            "\n" +
+            "file(ARCHIVE_EXTRACT\n" +
+            "        INPUT \${REACT_ROOT}/android/com/facebook/react/react-native/\${REACT_VERSION}/react-native-\${REACT_VERSION}.aar\n" +
+            "        DESTINATION \${PROJECT_BINARY_DIR}\n" +
+            "        PATTERNS jni/\${ANDROID_ABI}/*)\n" +
+            "\n" +
+            "add_definitions(\n" +
+            "        -DFOLLY_NO_CONFIG\n" +
+            "        -DFOLLY_HAVE_MEMRCHR=1\n" +
+            "        -DFOLLY_USE_LIBCPP=1\n" +
+            "        -DFOLLY_HAVE_CLOCK_GETTIME=1\n" +
+            ")\n" +
+            "add_library(\${LIB_NAME} SHARED \${SRC})\n" +
+            "\n" +
+            "include_directories(\n" +
+            "        \${REACT_ROOT}/ReactAndroid/build/third-party-ndk/folly\n" +
+            "        \${REACT_ROOT}/ReactAndroid/build/third-party-ndk/boost/boost_\${BOOST_VERSION}\n" +
+            "        \${REACT_ROOT}/ReactAndroid/build/third-party-ndk/glog/exported\n" +
+            "        \${REACT_ROOT}/ReactAndroid/build/third-party-ndk/double-conversion\n" +
+            "        \${REACT_ROOT}/ReactCommon\n" +
+            ")\n" +
+            "\n" +
+            "target_link_directories(\${LIB_NAME} PRIVATE \${PROJECT_BINARY_DIR}/jni/\${ANDROID_ABI})\n" +
+            "target_link_libraries(\${LIB_NAME} folly_json folly_futures glog c++_shared)"
+
+    def cmake = file(buildDir.absolutePath + '/intermediates/cmake/CMakeListe.txt')
+    if (cmake.exists()) return cmake
+
+    cmake.parentFile.mkdirs()
+    cmake.text = extra
+
+    return cmake
+}
+
+
+tasks.all {
+    Task t = it
+    if (t.name.startsWith('externalNativeBuild') && !t.name.contains('Clean')) {
+        t.dependsOn(
+                ReactAndroid.tasks.getByName('prepareDoubleConversion'),
+                ReactAndroid.tasks.getByName('prepareBoost'),
+                ReactAndroid.tasks.getByName('prepareFolly'),
+                ReactAndroid.tasks.getByName('prepareGlog')
+        )
+    }
+}
