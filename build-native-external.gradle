@@ -83,7 +83,7 @@ def prepareCMakeExtra() {
             "target_link_directories(\${LIB_NAME} PRIVATE \${PROJECT_BINARY_DIR}/jni/\${ANDROID_ABI})\n" +
             "target_link_libraries(\${LIB_NAME} folly_json folly_futures glog c++_shared)"
 
-    def cmake = file(buildDir.absolutePath + '/intermediates/cmake/CMakeListe.txt')
+    def cmake = file(buildDir.absolutePath + '/intermediates/cmake/CMakeLists.txt')
     if (cmake.exists()) return cmake
 
     cmake.parentFile.mkdirs()
